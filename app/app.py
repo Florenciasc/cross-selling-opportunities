@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # -----------------------------------
-# Estilos simples
+# Estilos
 # -----------------------------------
 st.markdown(
     """
@@ -49,17 +49,23 @@ st.markdown(
 )
 
 # -----------------------------------
-# Carga de datos (CORREGIDO)
+# Carga de datos (FIX)
 # -----------------------------------
 @st.cache_data
 def load_data():
-    path = "data/processed/recomendaciones_modelo.csv"
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    path = os.path.join(base_dir, "data", "processed", "recomendaciones_modelo.csv")
+
+    if not os.path.exists(path):
+        st.error(f"No se encontró el archivo: {path}")
+        st.stop()
+
     return pd.read_csv(path)
 
 recomendaciones = load_data()
 
 # -----------------------------------
-# Columnas reales
+# Columnas
 # -----------------------------------
 col_origen = "grupo_a"
 col_reco = "grupo_b"
@@ -68,13 +74,25 @@ col_freq = "frecuencia"
 col_ticket = "ticket_grupo_b"
 
 # -----------------------------------
-# Header
+# LOGO + HEADER
 # -----------------------------------
-st.markdown('<div class="main-title">🛒 Sistema de recomendación por macrogrupos</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="subtitle">Demo funcional · Sprint 2 · Recomendaciones basadas en co-ocurrencia y valor económico</div>',
-    unsafe_allow_html=True
-)
+logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+
+col_logo, col_title = st.columns([1, 6])
+
+with col_logo:
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=90)
+
+with col_title:
+    st.markdown(
+        '<div class="main-title">Sistema de recomendación por macrogrupos</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="subtitle">Demo funcional · Sprint 2 · Recomendaciones basadas en co-ocurrencia y valor económico</div>',
+        unsafe_allow_html=True
+    )
 
 st.markdown("---")
 
@@ -85,7 +103,7 @@ st.sidebar.header("Configuración de la demo")
 
 grupos = sorted(recomendaciones[col_origen].dropna().unique())
 grupo_seleccionado = st.sidebar.selectbox("Seleccionar grupo origen", grupos)
-top_k = st.sidebar.slider("Cantidad de recomendaciones", min_value=3, max_value=10, value=5)
+top_k = st.sidebar.slider("Cantidad de recomendaciones", 3, 10, 5)
 
 # -----------------------------------
 # Filtrado
@@ -98,103 +116,104 @@ df_grupo = (
 )
 
 # -----------------------------------
-# Resumen superior
+# Métricas
 # -----------------------------------
-top1, top2, top3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
-with top1:
+with col1:
     st.metric("Grupo origen", grupo_seleccionado)
 
-with top2:
+with col2:
     st.metric("Recomendaciones mostradas", len(df_grupo))
 
-with top3:
+with col3:
     if not df_grupo.empty:
-        st.metric("Score promedio", round(df_grupo[col_score].mean(), 3))
+        st.metric("Score promedio", f"{df_grupo[col_score].mean():.3f}")
     else:
-        st.metric("Score promedio", 0)
+        st.metric("Score promedio", "0.000")
 
 st.markdown("---")
 
 # -----------------------------------
-# Cards principales
+# Cards
 # -----------------------------------
 st.subheader("Top recomendaciones")
 
 if df_grupo.empty:
-    st.warning("No hay recomendaciones disponibles para este grupo.")
+    st.warning("No hay recomendaciones disponibles.")
 else:
-    card_cols = st.columns(min(3, len(df_grupo)))
+    cols = st.columns(min(3, len(df_grupo)))
 
-    for idx, (_, row) in enumerate(df_grupo.head(3).iterrows()):
-        with card_cols[idx]:
+    for i, (_, row) in enumerate(df_grupo.head(3).iterrows()):
+        with cols[i]:
             st.markdown(
                 f"""
                 <div class="card">
                     <h4>{row[col_reco]}</h4>
-                    <div class="small-text"><b>Score:</b> {round(row[col_score], 3)}</div>
-                    <div class="small-text"><b>Frecuencia:</b> {row[col_freq]}</div>
-                    <div class="small-text"><b>Ticket promedio:</b> {round(row[col_ticket], 2)}</div>
+                    <div class="small-text"><b>Score:</b> {row[col_score]:.3f}</div>
+                    <div class="small-text"><b>Frecuencia:</b> {int(row[col_freq])}</div>
+                    <div class="small-text"><b>Ticket promedio:</b> ${row[col_ticket]:,.2f}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
 # -----------------------------------
-# Layout principal
+# Tabla + insights
 # -----------------------------------
 left, right = st.columns([1.4, 1])
 
 with left:
     st.markdown("### Tabla completa")
+
     if not df_grupo.empty:
-        st.dataframe(
-            df_grupo[[col_reco, col_score, col_freq, col_ticket]],
-            use_container_width=True
-        )
+        tabla = df_grupo[[col_reco, col_score, col_freq, col_ticket]].rename(columns={
+            col_reco: "Grupo recomendado",
+            col_score: "Score",
+            col_freq: "Frecuencia",
+            col_ticket: "Ticket promedio"
+        })
+
+        # ✅ FORMATEO
+        tabla["Ticket promedio"] = tabla["Ticket promedio"].apply(lambda x: f"${x:,.2f}")
+
+        # ✅ MOSTRAR
+        st.dataframe(tabla, use_container_width=True)
 
 with right:
     st.markdown("### Lectura rápida")
     if not df_grupo.empty:
-        mejor_reco = df_grupo.iloc[0][col_reco]
-        st.success(f"La recomendación principal para **{grupo_seleccionado}** es **{mejor_reco}**.")
-
+        mejor = df_grupo.iloc[0][col_reco]
+        st.success(f"La mejor recomendación para **{grupo_seleccionado}** es **{mejor}**.")
         st.info(
-            "El ranking combina señales de frecuencia de co-ocurrencia y valor económico del grupo recomendado."
-        )
+    "Las recomendaciones se priorizan según frecuencia de co-compra y ticket promedio, permitiendo identificar oportunidades de cross-selling con mayor impacto económico."
+)
 
 # -----------------------------------
 # Gráfico
 # -----------------------------------
 if not df_grupo.empty:
     st.markdown("### Ranking visual")
-    chart_df = df_grupo[[col_reco, col_score]].set_index(col_reco)
-    st.bar_chart(chart_df)
+    st.bar_chart(df_grupo.set_index(col_reco)[col_score])
 
 # -----------------------------------
-# Explicación del modelo
+# Explicación
 # -----------------------------------
 st.markdown("---")
-exp1, exp2 = st.columns(2)
+colA, colB = st.columns(2)
 
-with exp1:
+with colA:
     st.markdown("### ¿Qué hace el modelo?")
     st.write(
-        """
-        El sistema recomienda macrogrupos complementarios a partir de compras históricas.
-        No se basa únicamente en popularidad, sino en relaciones detectadas entre grupos
-        que tienden a aparecer juntos.
-        """
+        "Recomienda macrogrupos que suelen comprarse juntos, detectando relaciones en el comportamiento histórico."
     )
 
-with exp2:
-    st.markdown("### Limitaciones actuales")
+with colB:
+    st.markdown("### Limitaciones")
     st.write(
-        """
-        - No hay personalización a nivel usuario.  
-        - Algunos grupos tienen menor cobertura por baja frecuencia.  
-        - El baseline supera al modelo en métricas tradicionales, pero el modelo aporta una lógica más orientada a negocio.
-        """
+        "- No es personalizado por usuario\n"
+        "- Algunos grupos tienen poca data\n"
+        "- Se puede mejorar con modelos más avanzados"
     )
 
 st.markdown("---")
