@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
 # -----------------------------------
 # Configuración general
@@ -175,6 +176,30 @@ def fallback_popularidad(df, top_n=5):
         })
     )
 
+def gauge_mini(valor_pct: float):
+    fig = go.Figure(go.Indicator(
+        mode="gauge",
+        value=valor_pct,
+        gauge={
+            "axis": {"range": [0, 100], "visible": False},
+            "bar": {"color": "#2563EB"},
+            "bgcolor": "white",
+            "steps": [
+                {"range": [0, 40], "color": "#FDE68A"},
+                {"range": [40, 70], "color": "#93C5FD"},
+                {"range": [70, 100], "color": "#86EFAC"}
+            ],
+        }
+    ))
+
+    fig.update_layout(
+        height=120,  # 👈 compacto
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)"
+    )
+
+    return fig
+
 # -----------------------------------
 # Header
 # -----------------------------------
@@ -260,9 +285,22 @@ with col2:
     st.metric("Principal categoría asociada", mejor)
 
 with col3:
-    st.metric("Nivel de oportunidad", nivel_oportunidad)
+    st.markdown("Nivel de oportunidad")
+    st.plotly_chart(gauge_mini(nivel_oportunidad_pct), use_container_width=True)
 
-st.markdown("---")
+    # 🎨 Color dinámico según nivel
+    if nivel_oportunidad == "Alta":
+        color = "#16A34A"   # verde
+    elif nivel_oportunidad == "Media":
+        color = "#2563EB"   # azul
+    else:
+        color = "#DC2626"   # rojo
+
+    st.markdown(
+        f"<div style='text-align:center; font-weight:600; color:{color}; font-size:1.3rem; letter-spacing:0.5px;'>"
+        f"{nivel_oportunidad}</div>",
+        unsafe_allow_html=True
+    )
 
 # -----------------------------------
 # Relación comercial detectada
