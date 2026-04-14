@@ -12,3 +12,7 @@ Thumbs.db
 
 # si luego procesan archivos pesados
 data/processed/*.csv
+
+PF/**/*.csv
+PF/**/*.pkl
+PF/**/*.joblib
