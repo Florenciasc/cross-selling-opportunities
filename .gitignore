@@ -12,6 +12,7 @@ Thumbs.db
 
 # si luego procesan archivos pesados
 data/processed/*.csv
+!data/processed/cross_selling_features.csv
 
 PF/**/*.csv
 PF/**/*.pkl
